@@ -1,159 +1,345 @@
 import * as THREE from 'three';
+import { VISUALIZER_PACKS } from './packs.js';
+import { createElectricNetwork } from './electric-network.js';
 
-const PLATE_COUNT = 620;
+const PLATE_COUNT = 1073;
 const tmpObject = new THREE.Object3D();
 const tmpColor = new THREE.Color();
+const silver = new THREE.Color(0xb0b7ba);
+const graphite = new THREE.Color(0x586065);
 
 export function createNanoHexVisualizer(canvas) {
   const renderer = new THREE.WebGLRenderer({
     canvas,
     antialias: true,
-    alpha: false,
     powerPreference: 'high-performance'
   });
-  renderer.setClearColor(0x03050b, 1);
+  renderer.setClearColor(0x050a0f, 1);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.25;
+  renderer.toneMappingExposure = 1.42;
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0x050814, 0.032);
+  scene.fog = new THREE.FogExp2(0x050a0f, 0.017);
 
-  const camera = new THREE.PerspectiveCamera(46, 1, 0.1, 120);
-  camera.position.set(0, 8.5, 15.5);
+  const camera = new THREE.OrthographicCamera(-11, 11, 11, -11, 0.1, 100);
+  camera.position.set(0, 24, 0);
+  camera.up.set(0, 0, -1);
   camera.lookAt(0, 0, 0);
 
-  const plateGeometry = new THREE.CylinderGeometry(0.48, 0.48, 0.12, 6, 1, false);
-  plateGeometry.rotateY(Math.PI / 6);
+  const socketGeometry = new THREE.CylinderGeometry(0.478, 0.478, 0.035, 6, 1, false);
+  let currentPack = VISUALIZER_PACKS[0];
 
   const plateMaterial = new THREE.MeshStandardMaterial({
-    color: 0x111923,
-    metalness: 0.82,
-    roughness: 0.28,
-    emissive: 0x050812,
-    emissiveIntensity: 0.45
+    color: currentPack.plateColor,
+    metalness: 0.23,
+    roughness: 0.36,
+    flatShading: true,
+    emissive: 0x06090b,
+    emissiveIntensity: 0.12
   });
 
-  const plates = new THREE.InstancedMesh(plateGeometry, plateMaterial, PLATE_COUNT);
+  const plates = new THREE.InstancedMesh(currentPack.plateGeometry, plateMaterial, PLATE_COUNT);
   plates.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   plates.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(PLATE_COUNT * 3), 3);
+  plates.frustumCulled = false;
   scene.add(plates);
 
-  const positions = buildHexPositions(PLATE_COUNT);
-  const baseColors = positions.map((plate) => {
-    const tint = plate.seed * 0.55 + plate.radius * 0.035;
-    return new THREE.Color().setHSL(0.56 + tint * 0.16, 0.72, 0.34);
+  const insetMaterial = new THREE.MeshStandardMaterial({
+    color: currentPack.insetColor,
+    metalness: 0.18,
+    roughness: 0.42,
+    emissive: 0x030506,
+    emissiveIntensity: 0.1
   });
+  const insets = new THREE.InstancedMesh(currentPack.insetGeometry, insetMaterial, PLATE_COUNT);
+  insets.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  insets.frustumCulled = false;
+  scene.add(insets);
+
+  const details = new THREE.InstancedMesh(
+    VISUALIZER_PACKS[1].detailGeometry,
+    VISUALIZER_PACKS[1].detailMaterial,
+    PLATE_COUNT
+  );
+  details.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  details.frustumCulled = false;
+  details.visible = false;
+  scene.add(details);
+
+  const sockets = new THREE.InstancedMesh(socketGeometry, new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    toneMapped: false
+  }), PLATE_COUNT);
+  sockets.frustumCulled = false;
+  scene.add(sockets);
+
+  const contactShadows = new THREE.InstancedMesh(
+    new THREE.CylinderGeometry(0.47, 0.47, 0.006, 6, 1, false),
+    new THREE.MeshBasicMaterial({
+      color: 0x000000,
+      transparent: true,
+      opacity: 0.55,
+      depthWrite: false
+    }),
+    PLATE_COUNT
+  );
+  contactShadows.frustumCulled = false;
+  scene.add(contactShadows);
+
+  const positions = buildHexPositions(PLATE_COUNT);
+  const heights = new Float32Array(PLATE_COUNT);
+  positions.forEach((plate, index) => {
+    tmpObject.position.set(plate.x, -0.17, plate.z);
+    tmpObject.rotation.set(0, 0, 0);
+    tmpObject.scale.setScalar(1);
+    tmpObject.updateMatrix();
+    sockets.setMatrixAt(index, tmpObject.matrix);
+    tmpColor.copy(plate.accent ? silver : graphite).multiplyScalar(0.065);
+    sockets.setColorAt(index, tmpColor);
+    tmpObject.position.y = -0.12;
+    tmpObject.updateMatrix();
+    contactShadows.setMatrixAt(index, tmpObject.matrix);
+  });
+  sockets.instanceMatrix.needsUpdate = true;
+  sockets.instanceColor.needsUpdate = true;
+  contactShadows.instanceMatrix.needsUpdate = true;
 
   const underGlow = createUnderGlow();
   scene.add(underGlow);
+  const electricNetwork = createElectricNetwork(positions);
+  scene.add(electricNetwork.group);
 
-  const coreLight = new THREE.PointLight(0x39e8ff, 42, 34, 1.6);
-  coreLight.position.set(0, 3.2, 2);
+  function setVariant(id) {
+    const next = VISUALIZER_PACKS.find((pack) => pack.id === id);
+    if (!next) return currentPack;
+    currentPack = next;
+    plates.geometry = next.plateGeometry;
+    plateMaterial.color.setHex(next.plateColor);
+    insets.geometry = next.insetGeometry;
+    insetMaterial.color.setHex(next.insetColor);
+    details.visible = Boolean(next.detailGeometry);
+    if (next.detailGeometry) {
+      details.geometry = next.detailGeometry;
+      details.material = next.detailMaterial;
+    }
+    electricNetwork.group.visible = Boolean(next.electric);
+    underGlow.material.uniforms.uMode.value = next.shaderMode;
+    return next;
+  }
+
+  const coreLight = new THREE.PointLight(0xcbd1d1, 11, 42, 1.2);
+  coreLight.position.set(0, 11, 3);
   scene.add(coreLight);
 
-  const magentaLight = new THREE.PointLight(0xff35bd, 26, 28, 1.8);
-  magentaLight.position.set(-5.4, 2.2, -4);
-  scene.add(magentaLight);
+  const sideLight = new THREE.PointLight(0x858c90, 9, 35, 1.2);
+  sideLight.position.set(-5.4, 10, -4);
+  scene.add(sideLight);
 
-  const rimLight = new THREE.DirectionalLight(0x9edcff, 2.4);
+  const rimLight = new THREE.DirectionalLight(0xe7f0f2, 3.2);
   rimLight.position.set(5, 9, 7);
   scene.add(rimLight);
-  scene.add(new THREE.AmbientLight(0x1a2440, 1.25));
+  scene.add(new THREE.AmbientLight(0xc1cbd0, 2.25));
 
-  const starField = createStarField();
-  scene.add(starField);
+  let lastFrame = 0;
+  let lastBeat = 0;
+  let lastImpactAt = -1000;
+  const impacts = [];
+
+  function triggerImpact(x = 0, z = 0, strength = 1) {
+    impacts.push({ x, z, started: performance.now(), strength });
+    if (impacts.length > 4) impacts.shift();
+  }
 
   function resize() {
     const rect = canvas.getBoundingClientRect();
-    const ratio = Math.min(window.devicePixelRatio || 1, 1.6);
+    const ratio = Math.min(window.devicePixelRatio || 1, rect.width < 720 ? 1.25 : 1.5);
     const width = Math.max(1, Math.floor(rect.width * ratio));
     const height = Math.max(1, Math.floor(rect.height * ratio));
 
     if (canvas.width !== width || canvas.height !== height) {
-      renderer.setSize(rect.width, rect.height, false);
       renderer.setPixelRatio(ratio);
-      camera.aspect = rect.width / Math.max(1, rect.height);
+      renderer.setSize(rect.width, rect.height, false);
+      const aspect = rect.width / Math.max(1, rect.height);
+      const halfHeight = Math.min(rect.width < 720 ? 9.6 : 8.7, 14.2 / aspect);
+      const halfWidth = halfHeight * aspect;
+      camera.left = -halfWidth;
+      camera.right = halfWidth;
+      camera.top = halfHeight;
+      camera.bottom = -halfHeight;
       camera.updateProjectionMatrix();
     }
   }
 
   function render(signals) {
+    const now = performance.now();
+    if (now - lastFrame < (canvas.clientWidth < 720 ? 33 : 20)) return;
+    const delta = Math.min(0.05, (now - lastFrame) / 1000 || 0.016);
+    lastFrame = now;
     resize();
 
-    const time = performance.now() / 1000;
-    const beat = signals.beat * signals.beat;
-    const bassPower = signals.bass * 1.25 + beat * 1.8;
-    const energy = signals.energy;
+    const time = now / 1000;
+    const beat = Math.max(0, signals.beat || 0);
+    const bass = Math.max(0, signals.bass || 0);
+    const energy = Math.max(0, signals.energy || 0);
+    if (beat > 0.72 && lastBeat <= 0.72 && now - lastImpactAt > 160) {
+      triggerImpact(0, 0, Math.min(1.15, 0.65 + bass * 0.8));
+      lastImpactAt = now;
+    }
+    lastBeat = beat;
+    while (impacts.length && now - impacts[0].started > 3000) impacts.shift();
 
     for (let index = 0; index < positions.length; index += 1) {
       const plate = positions[index];
-      const waveA = Math.sin(plate.radius * 1.95 - time * (3.2 + signals.bass * 4.4));
-      const waveB = Math.sin(plate.angle * 5.0 + plate.radius * 3.8 - time * 5.4);
-      const lift = Math.max(0, waveA * 0.72 + waveB * 0.28) * bassPower;
-      const micro = Math.sin(time * 7 + plate.seed * 11) * signals.treble * 0.06;
-      const y = lift * 1.55 + micro;
-      const scale = 0.92 + lift * 0.18 + beat * 0.08;
+      let front = 0;
+      let tail = 0;
+      let warpX = 0;
+      let warpZ = 0;
+      for (const impact of impacts) {
+        const age = (now - impact.started) / 1000;
+        const dx = plate.x - impact.x;
+        const dz = plate.z - impact.z;
+        const distance = Math.hypot(dx, dz);
+        let waveDistance = distance - age * 6.7;
+        if (currentPack.wave === 'faceted') {
+          waveDistance += Math.sin(Math.atan2(dz, dx) * 6) * 0.36;
+        } else if (currentPack.wave === 'spiral') {
+          waveDistance += Math.atan2(dz, dx) * 0.42;
+        } else if (currentPack.wave === 'diamond') {
+          waveDistance = (Math.abs(dx) + Math.abs(dz)) * 0.84 - age * 6.7;
+        } else if (currentPack.wave === 'fracture') {
+          waveDistance += Math.sin(plate.x * 1.4 + plate.z * 0.8) * 0.32;
+        }
+        const fade = Math.max(0, 1 - age / 3);
+        const leading = Math.exp(-waveDistance * waveDistance / 0.52) * impact.strength * fade;
+        const trailingDistance = waveDistance + 0.85;
+        const trailing = Math.exp(-trailingDistance * trailingDistance / 1.6) * impact.strength * fade;
+        front += leading;
+        tail += trailing;
+        if (distance > 0.01) {
+          warpX += dx / distance * (leading * 0.068 - trailing * 0.022) * currentPack.warp;
+          warpZ += dz / distance * (leading * 0.068 - trailing * 0.022) * currentPack.warp;
+        }
+      }
+      front = Math.min(1.35, front);
+      tail = Math.min(1, tail);
+      const target = 0.018 + (front * (0.46 + bass * 0.14) + tail * 0.045) * currentPack.lift;
+      heights[index] += (target - heights[index]) * Math.min(1, delta * 8);
+      const lift = heights[index];
+      const lean = Math.min(0.085, front * 0.058 * currentPack.tilt);
 
-      tmpObject.position.set(plate.x, y, plate.z);
-      tmpObject.rotation.set(
-        lift * 0.16 * Math.sin(plate.angle),
-        Math.PI / 6 + lift * 0.12,
-        lift * 0.16 * Math.cos(plate.angle)
+      tmpObject.position.set(
+        plate.x + warpX,
+        lift,
+        plate.z + warpZ
       );
-      tmpObject.scale.setScalar(scale);
+      tmpObject.rotation.set(
+        lean * Math.sin(plate.angle),
+        0,
+        lean * Math.cos(plate.angle)
+      );
+      const compression = Math.max(0.925, 1 - front * 0.045 * currentPack.compression + tail * 0.008);
+      tmpObject.scale.set(compression, 1, compression);
       tmpObject.updateMatrix();
       plates.setMatrixAt(index, tmpObject.matrix);
 
-      tmpColor.copy(baseColors[index]);
-      tmpColor.lerp(new THREE.Color(0x11f2ff), Math.min(1, lift * 0.65 + signals.treble * 0.24));
-      tmpColor.offsetHSL(0, 0.1 + energy * 0.25, lift * 0.22);
+      tmpObject.position.y = lift + currentPack.insetOffset;
+      tmpObject.updateMatrix();
+      insets.setMatrixAt(index, tmpObject.matrix);
+
+      if (details.visible) {
+        tmpObject.position.y = lift + currentPack.detailOffset;
+        tmpObject.updateMatrix();
+        details.setMatrixAt(index, tmpObject.matrix);
+      }
+
+      const reflection = 0.7 + front * 0.52 * currentPack.reflection + tail * 0.12;
+      tmpColor.setRGB(reflection, reflection, reflection);
       plates.setColorAt(index, tmpColor);
+      const insetReflection = 0.64 + front * 0.3 * currentPack.reflection + tail * 0.06;
+      tmpColor.setRGB(insetReflection, insetReflection, insetReflection);
+      insets.setColorAt(index, tmpColor);
+      if (details.visible) {
+        const detailReflection = 0.7 + front * 0.36 * currentPack.reflection;
+        tmpColor.setRGB(detailReflection, detailReflection, detailReflection);
+        details.setColorAt(index, tmpColor);
+      }
+
+      const metalShift = 0.5 + 0.5 * Math.sin(time * 0.3 + plate.x * 0.18 + plate.z * 0.26);
+      tmpColor.copy(graphite).lerp(silver, metalShift);
+      tmpColor.multiplyScalar((0.045 + front * (0.38 + bass * 0.16) + tail * 0.07) * currentPack.socket);
+      sockets.setColorAt(index, tmpColor);
     }
 
     plates.instanceMatrix.needsUpdate = true;
     plates.instanceColor.needsUpdate = true;
+    insets.instanceMatrix.needsUpdate = true;
+    insets.instanceColor.needsUpdate = true;
+    if (details.visible) {
+      details.instanceMatrix.needsUpdate = true;
+      details.instanceColor.needsUpdate = true;
+    }
+    sockets.instanceColor.needsUpdate = true;
 
     underGlow.material.uniforms.uTime.value = time;
-    underGlow.material.uniforms.uBass.value = signals.bass;
+    underGlow.material.uniforms.uBass.value = bass;
     underGlow.material.uniforms.uBeat.value = beat;
     underGlow.material.uniforms.uEnergy.value = energy;
+    if (electricNetwork.group.visible) electricNetwork.update(impacts, now, bass);
+    const latestImpact = impacts[impacts.length - 1];
+    underGlow.material.uniforms.uImpactStrength.value = latestImpact
+      ? latestImpact.strength * Math.max(0, 1 - (now - latestImpact.started) / 3000)
+      : 0;
+    underGlow.material.uniforms.uImpactRadius.value = latestImpact
+      ? (now - latestImpact.started) / 1000 * 6.7
+      : 0;
+    if (latestImpact) {
+      underGlow.material.uniforms.uImpactOrigin.value.set(latestImpact.x, -latestImpact.z);
+    }
 
-    coreLight.intensity = 32 + signals.bass * 70 + beat * 80;
-    magentaLight.intensity = 18 + signals.treble * 42;
+    coreLight.intensity = 11 + bass * 8;
+    sideLight.intensity = 9 + signals.treble * 6;
 
-    camera.position.x = Math.sin(time * 0.18) * 1.2;
-    camera.position.y = 8.2 + beat * 0.5;
-    camera.position.z = 15.2 - energy * 1.2;
-    camera.lookAt(0, 0.25 + beat * 0.35, 0);
+    camera.position.x = 0;
+    camera.position.y = 24;
+    camera.position.z = 0;
+    camera.lookAt(0, 0, 0);
 
-    starField.rotation.y = time * 0.025;
     renderer.render(scene, camera);
   }
 
   window.addEventListener('resize', resize);
 
-  return { resize, render };
+  canvas.addEventListener('pointerdown', (event) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = ((event.clientX - rect.left) / rect.width * 2 - 1) * camera.right;
+    const z = ((event.clientY - rect.top) / rect.height * 2 - 1) * camera.top;
+    triggerImpact(x, z);
+  });
+
+  return { resize, render, triggerImpact, setVariant };
 }
 
 function buildHexPositions(limit) {
   const plates = [];
-  const spacing = 0.86;
-  const rows = 18;
-  const columns = 36;
+  const spacingX = 0.825;
+  const spacingZ = 0.715;
+  const rows = 14;
+  const columns = 18;
 
   for (let row = -rows; row <= rows; row += 1) {
     for (let col = -columns; col <= columns; col += 1) {
-      const x = (col + (Math.abs(row) % 2) * 0.5) * spacing;
-      const z = row * spacing * 0.76;
+      const x = (col + (Math.abs(row) % 2) * 0.5) * spacingX;
+      const z = row * spacingZ;
       const radius = Math.hypot(x, z);
-      if (radius > 13.8 || plates.length >= limit) continue;
       plates.push({
         x,
         z,
+        row,
+        col,
         radius,
         angle: Math.atan2(z, x),
-        seed: fract(Math.sin((x * 12.9898 + z * 78.233) * 43758.5453))
+        accent: Math.sin(x * 0.8 + z * 0.45) > 0.83
       });
     }
   }
@@ -163,14 +349,16 @@ function buildHexPositions(limit) {
 
 function createUnderGlow() {
   const material = new THREE.ShaderMaterial({
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
+    depthWrite: true,
     uniforms: {
       uTime: { value: 0 },
       uBass: { value: 0 },
       uBeat: { value: 0 },
-      uEnergy: { value: 0 }
+      uEnergy: { value: 0 },
+      uImpactOrigin: { value: new THREE.Vector2(0, 0) },
+      uImpactRadius: { value: 0 },
+      uImpactStrength: { value: 0 },
+      uMode: { value: 0 }
     },
     vertexShader: `
       varying vec2 vUv;
@@ -188,58 +376,41 @@ function createUnderGlow() {
       uniform float uBass;
       uniform float uBeat;
       uniform float uEnergy;
+      uniform vec2 uImpactOrigin;
+      uniform float uImpactRadius;
+      uniform float uImpactStrength;
+      uniform float uMode;
 
       void main() {
-        vec2 uv = vUv * 2.0 - 1.0;
-        float d = length(uv);
-        float ripple = sin(d * 38.0 - uTime * (5.0 + uBass * 8.0));
-        float veins = sin((uv.x - uv.y) * 28.0 + uTime * 2.5) * sin((uv.x + uv.y) * 18.0 - uTime * 1.7);
-        float mask = smoothstep(1.0, 0.12, d);
-        float power = 0.14 + uEnergy * 0.5 + uBass * 0.8 + uBeat * 1.4;
-        vec3 cyan = vec3(0.02, 0.92, 1.0);
-        vec3 violet = vec3(0.52, 0.12, 1.0);
-        vec3 magenta = vec3(1.0, 0.12, 0.72);
-        vec3 color = mix(violet, cyan, 0.5 + 0.5 * ripple);
-        color = mix(color, magenta, uBeat * 0.45);
-        float alpha = mask * power * (0.34 + max(ripple, 0.0) * 0.45 + max(veins, 0.0) * 0.18);
-        gl_FragColor = vec4(color * alpha * 2.2, alpha);
+        vec2 p = (vUv - 0.5) * vec2(32.0, 26.0);
+        vec2 delta = p - uImpactOrigin;
+        float distanceFromImpact = length(delta);
+        float textureDetail = 0.5 + 0.5 * sin(p.x * 0.22 + uTime * 0.3);
+        if (uMode > 3.5) {
+          textureDetail = max(abs(sin(p.x * 1.5)), abs(sin(p.y * 1.5)));
+        } else if (uMode > 2.5) {
+          distanceFromImpact = (abs(delta.x) + abs(delta.y)) * 0.84;
+          textureDetail = max(abs(sin(p.x * 2.4)), abs(sin(p.y * 2.4)));
+        } else if (uMode > 1.5) {
+          distanceFromImpact += atan(delta.y, delta.x) * 0.42;
+          textureDetail = 0.5 + 0.5 * sin(length(p) * 1.3);
+        } else if (uMode > 0.5) {
+          distanceFromImpact += sin(atan(delta.y, delta.x) * 6.0) * 0.36;
+          textureDetail = abs(sin(p.x * 1.4 + p.y * 0.7));
+        }
+        float band = distanceFromImpact - uImpactRadius;
+        float ripple = exp(-band * band / 0.85) * uImpactStrength;
+        if (uMode > 3.5) ripple *= 0.25;
+        float power = 0.23 + uEnergy * 0.18 + uBass * 0.16 + uBeat * 0.08;
+        vec3 graphite = vec3(0.008, 0.009, 0.011);
+        vec3 silver = mix(vec3(0.055), vec3(0.15), textureDetail);
+        gl_FragColor = vec4(graphite + silver * ripple * power, 1.0);
       }
     `
   });
 
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(32, 26, 1, 1), material);
   mesh.rotation.x = -Math.PI / 2;
-  mesh.position.y = -0.14;
+  mesh.position.y = -0.23;
   return mesh;
-}
-
-function createStarField() {
-  const geometry = new THREE.BufferGeometry();
-  const points = new Float32Array(360 * 3);
-
-  for (let index = 0; index < 360; index += 1) {
-    const i = index * 3;
-    const angle = index * 9.399;
-    const radius = 18 + fract(Math.sin(index * 87.23) * 31.11) * 24;
-    points[i] = Math.cos(angle) * radius;
-    points[i + 1] = 4 + fract(Math.sin(index * 19.91) * 17.71) * 13;
-    points[i + 2] = Math.sin(angle) * radius - 8;
-  }
-
-  geometry.setAttribute('position', new THREE.BufferAttribute(points, 3));
-
-  return new THREE.Points(
-    geometry,
-    new THREE.PointsMaterial({
-      color: 0x6ddfff,
-      size: 0.035,
-      transparent: true,
-      opacity: 0.44,
-      blending: THREE.AdditiveBlending
-    })
-  );
-}
-
-function fract(value) {
-  return value - Math.floor(value);
 }

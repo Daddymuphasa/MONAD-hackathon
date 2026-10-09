@@ -1,25 +1,24 @@
 # Papageddon Monad
 
-Papageddon is a browser-native audio visualizer for the Monad hackathon. It listens for music in real time, renders high-definition sci-fi visual packs, and uses Monad testnet payments as the unlock path for personalized AI-generated packs.
+Papageddon is a browser music visualizer for the Monad hackathon. Its current demo turns bass impacts into physical motion across a black nanotech display.
 
-## Current Direction
+## Run locally
 
-- Port the working Celo hackathon version into this repo once its local path is available.
-- Replace the current visual language with a premium nanotech style: hex fields, armor-like ripples, energy waves, and modular sci-fi surfaces.
-- Keep the visualizer optimized for browser use while the user is working on the same machine or a second screen.
-- Integrate Monad testnet tokens for custom pack generation, unlocks, and mintable listening experiences.
+```sh
+npm install
+npm run dev
+```
 
-## Product Loop
+Open the Vite URL ending in `/monad/`. Run `npm test` for audio onset checks or `npm run build` for a production bundle.
 
-1. The user opens Papageddon in a browser.
-2. The app listens for music through available browser audio input.
-3. When music is detected, a visual pack activates automatically.
-4. The visualizer reacts to rhythm, energy, bass, mids, treble, and texture.
-5. The user can request a personalized pack based on brand colors, niche, workflow, or art style.
-6. The user pays with Monad testnet tokens to generate or unlock that pack.
-7. The generated experience can be saved, minted, reused, or shared.
+## Current demo
 
-## Repo Status
+- Select a local audio file, then play, pause, and seek. The file stays in the browser; Web Audio analyses the playing element without an upload service.
+- Use the microphone as an alternate input.
+- Switch live between Nano Hex Genesis, Armor Scales, Obsidian Bloom, Circuit Matrix, and Electric Nexus. Pack changes do not restart the audio source.
+- Bass onsets trigger short-lived mechanical shockwaves. Electric Nexus uses the same onset signal to send charge through connected nodes and sparks.
+- Click the display to preview an impact without audio.
 
-This repo is currently being prepared as the Monad target for the existing working prototype.
+## Monad status
 
+The custom-pack quote is a UI preview. The repository has a draft Monad experience registry contract, but payment, AI generation, and minting are not connected or deployed yet.
