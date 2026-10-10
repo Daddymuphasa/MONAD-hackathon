@@ -2,7 +2,14 @@ import './styles/app.css';
 import { createAudioEngine } from './audio/audio-engine.js';
 import { createNanoHexVisualizer } from './visualizers/nano-hex.js';
 import { VISUALIZER_PACKS } from './visualizers/packs.js';
+import { createAutoMode } from './visualizers/auto-mode.js';
 import { MONAD_TESTNET, buildPackQuote } from './monad/monad-testnet.js';
+import {
+  connectMonadWallet,
+  createVisualMemoryPayload,
+  deployVisualMemoryContract,
+  mintVisualMemory
+} from './monad/wallet.js';
 
 const app = document.querySelector('#app');
 const packOptions = VISUALIZER_PACKS.map((pack) => `<option value="${pack.id}">${pack.name}</option>`).join('');
@@ -10,26 +17,36 @@ const packOptions = VISUALIZER_PACKS.map((pack) => `<option value="${pack.id}">$
 app.innerHTML = `
   <section class="shell">
     <canvas id="visualizer" aria-label="Papageddon live nanotech visualizer"></canvas>
-    <div class="display-frame" aria-hidden="true">
-      <span class="frame-corner top-left"></span>
-      <span class="frame-corner top-right"></span>
-      <span class="frame-corner bottom-left"></span>
-      <span class="frame-corner bottom-right"></span>
-      <span class="frame-notch top-notch"></span>
-      <span class="frame-notch bottom-notch"></span>
-    </div>
+    <img class="brand-mark" src="${import.meta.env.BASE_URL}assets/papagedon-mark.png" alt="Papagedon" />
     <aside class="panel">
-      <button id="dockToggle" class="dock-toggle" type="button" aria-label="Pin controls" aria-pressed="false" aria-expanded="false" title="Pin controls">
-        <span class="dock-icon" aria-hidden="true">&#9776;</span>
-        <span class="dock-name" aria-hidden="true">PAPAGEDDON</span>
-      </button>
+      <span class="panel-trigger" aria-hidden="true"></span>
       <div class="panel-content">
-      <div class="brand">
-        <span class="mark"></span>
-        <div>
-          <p>PAPAGEDDON</p>
-          <strong>Monad visual runtime</strong>
+      <header class="panel-header">
+        <div><span class="live-dot"></span> Live visual</div>
+        <span>Monad testnet</span>
+      </header>
+
+      <div class="track-player">
+        <div class="track-heading"><span>Audio Track</span><b id="trackState">none</b></div>
+        <input id="trackFile" type="file" accept="audio/*" hidden>
+        <div class="track-actions">
+          <button id="selectTrackButton" type="button">Choose Track</button>
+          <button id="playTrackButton" type="button" disabled>Play</button>
         </div>
+        <p id="trackName">No track selected</p>
+        <div class="track-timeline">
+          <span id="trackTime">0:00</span>
+          <input id="trackSeek" type="range" min="0" max="1000" value="0" aria-label="Seek in track" disabled>
+          <span id="trackDuration">0:00</span>
+        </div>
+        <audio id="trackAudio" preload="metadata"></audio>
+      </div>
+
+      <button id="listenButton" class="primary" type="button">Start Microphone</button>
+
+      <div class="mode-switch" role="group" aria-label="Visualizer mode">
+        <button id="autoModeButton" type="button" aria-pressed="true">Auto</button>
+        <button id="manualModeButton" type="button" aria-pressed="false">Manual</button>
       </div>
 
       <div class="status-grid">
@@ -52,30 +69,25 @@ app.innerHTML = `
         <label>Energy <i id="energyMeter"></i></label>
       </div>
 
-      <div class="track-player">
-        <div class="track-heading"><span>Audio Track</span><b id="trackState">none</b></div>
-        <input id="trackFile" type="file" accept="audio/*" hidden>
-        <div class="track-actions">
-          <button id="selectTrackButton" type="button">Choose Track</button>
-          <button id="playTrackButton" type="button" disabled>Play</button>
-        </div>
-        <p id="trackName">No track selected</p>
-        <div class="track-timeline">
-          <span id="trackTime">0:00</span>
-          <input id="trackSeek" type="range" min="0" max="1000" value="0" aria-label="Seek in track" disabled>
-          <span id="trackDuration">0:00</span>
-        </div>
-        <audio id="trackAudio" preload="metadata"></audio>
+      <div class="sensitivity-control">
+        <label for="sensitivity">Sensitivity <output id="sensitivityValue" for="sensitivity">1.2x</output></label>
+        <input id="sensitivity" type="range" min="0.7" max="2" step="0.1" value="1.2">
       </div>
 
       <div class="composer">
-        <span>AI Pack Prompt</span>
+        <label for="packPrompt">Custom Pack Style</label>
         <textarea id="packPrompt">Generate a high-definition nanotech hex pack with black chrome plates, layered graphite reflections, and subtle light moving beneath the surface.</textarea>
-        <button id="quoteButton">Quote Monad Pack</button>
-        <p id="quoteOutput">Custom visual packs are paid with Monad testnet tokens.</p>
+        <button id="quoteButton" type="button">Preview Testnet Quote</button>
+        <p id="quoteOutput" role="status">Payment and minting are not connected yet.</p>
       </div>
 
-      <button id="listenButton" class="primary">Start Microphone</button>
+      <section class="chain-actions" aria-label="Monad deployment">
+        <div class="chain-heading"><span>Visual Memory NFT</span><b>Testnet only</b></div>
+        <button id="connectWalletButton" type="button">Connect Wallet</button>
+        <button id="deployContractButton" type="button" disabled>Deployed</button>
+        <button id="mintMemoryButton" class="mint-action" type="button" disabled>Mint Visual Memory · 0.2 MON</button>
+        <p id="chainOutput" role="status">Contract: ${MONAD_TESTNET.visualMemoryContract}</p>
+      </section>
       </div>
     </aside>
   </section>
@@ -87,8 +99,6 @@ const trackAudio = document.querySelector('#trackAudio');
 const audio = createAudioEngine(trackAudio);
 
 const listenButton = document.querySelector('#listenButton');
-const panel = document.querySelector('.panel');
-const dockToggle = document.querySelector('#dockToggle');
 const listenState = document.querySelector('#listenState');
 const musicLock = document.querySelector('#musicLock');
 const impactState = document.querySelector('#impactState');
@@ -105,6 +115,17 @@ const trackDuration = document.querySelector('#trackDuration');
 const quoteButton = document.querySelector('#quoteButton');
 const quoteOutput = document.querySelector('#quoteOutput');
 const packPrompt = document.querySelector('#packPrompt');
+const sensitivity = document.querySelector('#sensitivity');
+const sensitivityValue = document.querySelector('#sensitivityValue');
+const autoModeButton = document.querySelector('#autoModeButton');
+const manualModeButton = document.querySelector('#manualModeButton');
+const connectWalletButton = document.querySelector('#connectWalletButton');
+const deployContractButton = document.querySelector('#deployContractButton');
+const mintMemoryButton = document.querySelector('#mintMemoryButton');
+const chainOutput = document.querySelector('#chainOutput');
+const autoMode = createAutoMode(VISUALIZER_PACKS);
+
+let walletSession = null;
 
 const meters = {
   bass: document.querySelector('#bassMeter'),
@@ -116,31 +137,20 @@ const meters = {
 let isListening = false;
 let lastImpactAt = -1000;
 let lastBeat = 0;
-let pointerDockFocus = false;
+let autoEnabled = true;
+autoMode.start(performance.now(), packSelect.value);
 
-function syncDockState() {
-  const expanded = panel.classList.contains('pinned') || panel.matches(':hover') || panel.contains(document.activeElement);
-  dockToggle.setAttribute('aria-expanded', String(expanded));
-  dockToggle.setAttribute('aria-pressed', String(panel.classList.contains('pinned')));
-  dockToggle.setAttribute('aria-label', panel.classList.contains('pinned') ? 'Unpin controls' : 'Pin controls');
-  dockToggle.title = panel.classList.contains('pinned') ? 'Unpin controls' : 'Pin controls';
+sensitivity.addEventListener('input', () => {
+  audio.setSensitivity(sensitivity.value);
+  sensitivityValue.value = `${Number(sensitivity.value).toFixed(1)}x`;
+});
+
+function setMode(auto) {
+  autoEnabled = auto;
+  autoModeButton.setAttribute('aria-pressed', String(auto));
+  manualModeButton.setAttribute('aria-pressed', String(!auto));
+  if (auto) autoMode.start(performance.now(), packSelect.value);
 }
-
-dockToggle.addEventListener('click', () => {
-  panel.classList.toggle('pinned');
-  syncDockState();
-});
-panel.addEventListener('mouseenter', syncDockState);
-panel.addEventListener('pointerdown', () => { pointerDockFocus = true; });
-document.addEventListener('keydown', () => { pointerDockFocus = false; });
-panel.addEventListener('mouseleave', () => {
-  if (pointerDockFocus && !panel.classList.contains('pinned') && panel.contains(document.activeElement)) {
-    document.activeElement.blur();
-  }
-  syncDockState();
-});
-panel.addEventListener('focusin', syncDockState);
-panel.addEventListener('focusout', () => requestAnimationFrame(syncDockState));
 
 function selectPack(id) {
   packSelect.value = id;
@@ -148,7 +158,12 @@ function selectPack(id) {
   packState.textContent = pack.name;
 }
 
-packSelect.addEventListener('change', () => selectPack(packSelect.value));
+autoModeButton.addEventListener('click', () => setMode(true));
+manualModeButton.addEventListener('click', () => setMode(false));
+packSelect.addEventListener('change', () => {
+  setMode(false);
+  selectPack(packSelect.value);
+});
 
 window.addEventListener('keydown', (event) => {
   if (!['ArrowLeft', 'ArrowRight'].includes(event.key) || event.altKey || event.ctrlKey || event.metaKey) return;
@@ -157,6 +172,7 @@ window.addEventListener('keydown', (event) => {
   const index = VISUALIZER_PACKS.findIndex((pack) => pack.id === packSelect.value);
   const step = event.key === 'ArrowRight' ? 1 : -1;
   const next = VISUALIZER_PACKS[(index + step + VISUALIZER_PACKS.length) % VISUALIZER_PACKS.length];
+  setMode(false);
   selectPack(next.id);
 });
 
@@ -182,6 +198,10 @@ function setMeter(node, value) {
 
 function frame() {
   const signals = audio.sample();
+  if (autoEnabled) {
+    const nextPack = autoMode.maybeNext(performance.now(), signals.beat, packSelect.value);
+    if (nextPack) selectPack(nextPack);
+  }
   visualizer.render(signals);
   setMeter(meters.bass, signals.bass);
   setMeter(meters.mid, signals.mid);
@@ -287,7 +307,71 @@ window.addEventListener('pagehide', () => { void audio.dispose(); });
 
 quoteButton.addEventListener('click', () => {
   const quote = buildPackQuote(packPrompt.value);
-  quoteOutput.textContent = `${quote.price} testnet MON unlocks "${quote.packName}" generation on ${MONAD_TESTNET.name}.`;
+  quoteOutput.textContent = `Preview: ${quote.price} testnet MON for "${quote.packName}". No payment is being requested.`;
+});
+
+connectWalletButton.addEventListener('click', async () => {
+  connectWalletButton.disabled = true;
+  chainOutput.textContent = 'Waiting for wallet connection...';
+  try {
+    walletSession = await connectMonadWallet();
+    const shortAddress = `${walletSession.address.slice(0, 6)}...${walletSession.address.slice(-4)}`;
+    connectWalletButton.textContent = shortAddress;
+    mintMemoryButton.disabled = false;
+    chainOutput.textContent = `${Number(walletSession.balance).toFixed(4)} testnet MON available. Visual Memory minting is ready.`;
+  } catch (error) {
+    connectWalletButton.disabled = false;
+    chainOutput.textContent = error.shortMessage || error.message;
+  }
+});
+
+deployContractButton.addEventListener('click', async () => {
+  if (MONAD_TESTNET.visualMemoryContract) return;
+  if (!walletSession) return;
+  deployContractButton.disabled = true;
+  chainOutput.textContent = 'Confirm the testnet deployment in your wallet...';
+  try {
+    const deployment = await deployVisualMemoryContract(walletSession.signer);
+    localStorage.setItem('papagedon.visualMemoryContract', deployment.address);
+    deployContractButton.textContent = 'Deployed';
+    chainOutput.textContent = `Contract deployed at ${deployment.address}`;
+  } catch (error) {
+    deployContractButton.disabled = false;
+    chainOutput.textContent = error.shortMessage || error.message;
+  }
+});
+
+mintMemoryButton.addEventListener('click', async () => {
+  if (!walletSession) return;
+  const styleBrief = packPrompt.value.trim();
+  if (!styleBrief) {
+    chainOutput.textContent = 'Describe your visual taste before minting.';
+    packPrompt.focus();
+    return;
+  }
+
+  const pack = VISUALIZER_PACKS.find((candidate) => candidate.id === packSelect.value);
+  const payload = createVisualMemoryPayload({
+    pack,
+    sensitivity: Number(sensitivity.value),
+    autoMode: autoEnabled,
+    styleBrief
+  });
+
+  mintMemoryButton.disabled = true;
+  chainOutput.textContent = 'Confirm the 0.2 testnet MON mint in your wallet...';
+  try {
+    const result = await mintVisualMemory(
+      walletSession.signer,
+      MONAD_TESTNET.visualMemoryContract,
+      payload
+    );
+    mintMemoryButton.textContent = `Minted Memory #${result.tokenId}`;
+    chainOutput.textContent = `Visual Memory #${result.tokenId} minted. Transaction: ${result.transactionHash}`;
+  } catch (error) {
+    mintMemoryButton.disabled = false;
+    chainOutput.textContent = error.shortMessage || error.message;
+  }
 });
 
 visualizer.resize();

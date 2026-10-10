@@ -17,6 +17,10 @@ function detailMaterial(color, vertexColors = false) {
 
 const circuitRing = new THREE.TorusGeometry(0.265, 0.024, 3, 6);
 circuitRing.rotateX(-Math.PI / 2);
+const haloRing = new THREE.TorusGeometry(0.255, 0.04, 4, 8);
+haloRing.rotateX(-Math.PI / 2);
+const copperRing = new THREE.TorusGeometry(0.21, 0.065, 4, 6);
+copperRing.rotateX(-Math.PI / 2);
 
 export const VISUALIZER_PACKS = [
   {
@@ -117,5 +121,110 @@ export const VISUALIZER_PACKS = [
     reflection: 0.38,
     socket: 0.32,
     electric: true
+  },
+  {
+    id: 'gilded-reactor',
+    name: 'Gilded Reactor',
+    wave: 'rings',
+    shaderMode: 5,
+    plateGeometry: hex(0.42, 0.468, 0.22),
+    insetGeometry: hex(0.32, 0.32, 0.014),
+    plateColor: 0x5c4630,
+    insetColor: 0x162b25,
+    insetOffset: 0.117,
+    detailGeometry: haloRing,
+    detailMaterial: detailMaterial(0xd5ad63),
+    detailOffset: 0.134,
+    lift: 1.1,
+    tilt: 0.8,
+    compression: 0.7,
+    warp: 0.9,
+    reflection: 1.25,
+    socket: 1.1,
+    glowColor: 0xd5ad63
+  },
+  {
+    id: 'emerald-flux',
+    name: 'Emerald Flux',
+    wave: 'tide',
+    shaderMode: 6,
+    plateGeometry: hex(0.385, 0.47, 0.27),
+    insetGeometry: hex(0.23, 0.23, 0.012),
+    plateColor: 0x18483a,
+    insetColor: 0x102a25,
+    insetOffset: 0.141,
+    detailGeometry: new THREE.ConeGeometry(0.17, 0.24, 6),
+    detailMaterial: detailMaterial(0x76cfad),
+    detailOffset: 0.23,
+    lift: 1.3,
+    tilt: 0.65,
+    compression: 0.9,
+    warp: 1.1,
+    reflection: 1.15,
+    socket: 1.05,
+    glowColor: 0x65cfa5
+  },
+  {
+    id: 'halo-relay',
+    name: 'Halo Relay',
+    wave: 'cross',
+    shaderMode: 7,
+    plateGeometry: hex(0.45, 0.468, 0.095),
+    insetGeometry: hex(0.345, 0.345, 0.012),
+    plateColor: 0x283b44,
+    insetColor: 0x101e27,
+    insetOffset: 0.054,
+    detailGeometry: haloRing,
+    detailMaterial: detailMaterial(0x7bc7d7),
+    detailOffset: 0.072,
+    lift: 0.55,
+    tilt: 0.4,
+    compression: 0.55,
+    warp: 1.35,
+    reflection: 1.35,
+    socket: 1.2,
+    glowColor: 0x7bc7d7
+  },
+  {
+    id: 'prism-shards',
+    name: 'Prism Shards',
+    wave: 'shard',
+    shaderMode: 8,
+    plateGeometry: new THREE.CylinderGeometry(0.26, 0.465, 0.32, 3),
+    insetGeometry: new THREE.CylinderGeometry(0.15, 0.15, 0.012, 3),
+    plateColor: 0x4a3150,
+    insetColor: 0x211727,
+    insetOffset: 0.166,
+    detailGeometry: new THREE.TetrahedronGeometry(0.095),
+    detailMaterial: detailMaterial(0xb98bbc),
+    detailOffset: 0.205,
+    lift: 1.45,
+    tilt: 1.18,
+    compression: 1.1,
+    warp: 1.3,
+    reflection: 1.18,
+    socket: 0.95,
+    glowColor: 0xb98bbc
+  },
+  {
+    id: 'copper-pulse',
+    name: 'Copper Pulse',
+    wave: 'chevron',
+    shaderMode: 9,
+    plateGeometry: hex(0.41, 0.465, 0.185),
+    insetGeometry: hex(0.315, 0.315, 0.012),
+    plateColor: 0x513b35,
+    insetColor: 0x182a2b,
+    insetOffset: 0.099,
+    detailGeometry: copperRing,
+    detailMaterial: detailMaterial(0xc78368),
+    detailOffset: 0.115,
+    lift: 0.92,
+    tilt: 0.92,
+    compression: 0.88,
+    warp: 1.12,
+    reflection: 1.25,
+    socket: 1.08,
+    glowColor: 0xc78368
   }
 ];

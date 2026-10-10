@@ -2,7 +2,8 @@ export const MONAD_TESTNET = {
   name: 'Monad Testnet',
   nativeCurrency: 'MON',
   paymentToken: 'Testnet MON',
-  chainId: '0x279f'
+  chainId: '0x279f',
+  visualMemoryContract: '0xD0793d7B3897A992ccc8f7188F5F2eE3AA21a590'
 };
 
 export function buildPackQuote(prompt) {

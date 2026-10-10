@@ -85,6 +85,19 @@ test('microphone and file playback share prompt bass onset analysis', async () =
     assert.equal(audio.sample().beat, 0);
     await audio.playFile();
     assert.equal(mediaSourceCreations, 1);
+
+    bassLevel = 0;
+    now = 900;
+    audio.sample();
+    bassLevel = 0.12;
+    now = 1100;
+    const quietHit = audio.sample();
+    assert.equal(quietHit.beat, 1);
+    assert.ok(quietHit.pulse > 0);
+    now = 1400;
+    assert.ok(audio.sample().beat < 1);
+    audio.setSensitivity(2);
+    assert.ok(audio.sample().bass > quietHit.bass);
     await audio.dispose();
   } finally {
     for (const [name, descriptor] of [

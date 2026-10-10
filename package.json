@@ -7,11 +7,20 @@
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
     "test": "node --test",
+    "contract:compile": "hardhat compile",
+    "contract:test": "hardhat run scripts/contract-smoke.js",
+    "contract:export": "node scripts/export-contract-client.js",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^5.0.0",
     "three": "^0.186.1",
     "vite": "^7.1.0"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-ethers": "^4.2.0",
+    "@openzeppelin/contracts": "^5.0.2",
+    "ethers": "^6.17.0",
+    "hardhat": "^3.19.0"
   }
 }

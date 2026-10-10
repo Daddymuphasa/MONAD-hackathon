@@ -7,6 +7,7 @@ const tmpObject = new THREE.Object3D();
 const tmpColor = new THREE.Color();
 const silver = new THREE.Color(0xb0b7ba);
 const graphite = new THREE.Color(0x586065);
+const socketAccent = new THREE.Color(0xb0b7ba);
 
 export function createNanoHexVisualizer(canvas) {
   const renderer = new THREE.WebGLRenderer({
@@ -114,6 +115,7 @@ export function createNanoHexVisualizer(canvas) {
     const next = VISUALIZER_PACKS.find((pack) => pack.id === id);
     if (!next) return currentPack;
     currentPack = next;
+    socketAccent.setHex(next.glowColor ?? 0xb0b7ba);
     plates.geometry = next.plateGeometry;
     plateMaterial.color.setHex(next.plateColor);
     insets.geometry = next.insetGeometry;
@@ -125,6 +127,7 @@ export function createNanoHexVisualizer(canvas) {
     }
     electricNetwork.group.visible = Boolean(next.electric);
     underGlow.material.uniforms.uMode.value = next.shaderMode;
+    underGlow.material.uniforms.uTint.value.setHex(next.glowColor ?? 0xffffff);
     return next;
   }
 
@@ -181,9 +184,10 @@ export function createNanoHexVisualizer(canvas) {
     const time = now / 1000;
     const beat = Math.max(0, signals.beat || 0);
     const bass = Math.max(0, signals.bass || 0);
+    const pulse = Math.max(0, signals.pulse || 0);
     const energy = Math.max(0, signals.energy || 0);
     if (beat > 0.72 && lastBeat <= 0.72 && now - lastImpactAt > 160) {
-      triggerImpact(0, 0, Math.min(1.15, 0.65 + bass * 0.8));
+      triggerImpact(0, 0, Math.min(1.45, 0.78 + bass));
       lastImpactAt = now;
     }
     lastBeat = beat;
@@ -209,6 +213,16 @@ export function createNanoHexVisualizer(canvas) {
           waveDistance = (Math.abs(dx) + Math.abs(dz)) * 0.84 - age * 6.7;
         } else if (currentPack.wave === 'fracture') {
           waveDistance += Math.sin(plate.x * 1.4 + plate.z * 0.8) * 0.32;
+        } else if (currentPack.wave === 'rings') {
+          waveDistance += Math.sin(distance * 2.8) * 0.24;
+        } else if (currentPack.wave === 'tide') {
+          waveDistance = Math.abs(dz) - age * 6.7;
+        } else if (currentPack.wave === 'cross') {
+          waveDistance = Math.min(Math.abs(dx), Math.abs(dz)) * 1.7 - age * 6.7;
+        } else if (currentPack.wave === 'shard') {
+          waveDistance += Math.sin(Math.atan2(dz, dx) * 9) * 0.48;
+        } else if (currentPack.wave === 'chevron') {
+          waveDistance = Math.abs(dx + dz) * 0.82 - age * 6.7;
         }
         const fade = Math.max(0, 1 - age / 3);
         const leading = Math.exp(-waveDistance * waveDistance / 0.52) * impact.strength * fade;
@@ -223,7 +237,10 @@ export function createNanoHexVisualizer(canvas) {
       }
       front = Math.min(1.35, front);
       tail = Math.min(1, tail);
-      const target = 0.018 + (front * (0.46 + bass * 0.14) + tail * 0.045) * currentPack.lift;
+      const spatialPulse = 0.55 + 0.45 * Math.sin(plate.radius * 1.35 - time * 5.2);
+      const liveBass = Math.min(1, bass * 0.8 + pulse * 0.7) * spatialPulse;
+      const target = 0.018 + liveBass * 0.2 +
+        (front * (0.56 + bass * 0.18) + tail * 0.055) * currentPack.lift;
       heights[index] += (target - heights[index]) * Math.min(1, delta * 8);
       const lift = heights[index];
       const lean = Math.min(0.085, front * 0.058 * currentPack.tilt);
@@ -253,21 +270,21 @@ export function createNanoHexVisualizer(canvas) {
         details.setMatrixAt(index, tmpObject.matrix);
       }
 
-      const reflection = 0.7 + front * 0.52 * currentPack.reflection + tail * 0.12;
+      const reflection = 0.7 + liveBass * 0.5 + front * 0.6 * currentPack.reflection + tail * 0.14;
       tmpColor.setRGB(reflection, reflection, reflection);
       plates.setColorAt(index, tmpColor);
-      const insetReflection = 0.64 + front * 0.3 * currentPack.reflection + tail * 0.06;
+      const insetReflection = 0.64 + liveBass * 0.32 + front * 0.36 * currentPack.reflection + tail * 0.07;
       tmpColor.setRGB(insetReflection, insetReflection, insetReflection);
       insets.setColorAt(index, tmpColor);
       if (details.visible) {
-        const detailReflection = 0.7 + front * 0.36 * currentPack.reflection;
+        const detailReflection = 0.7 + liveBass * 0.28 + front * 0.42 * currentPack.reflection;
         tmpColor.setRGB(detailReflection, detailReflection, detailReflection);
         details.setColorAt(index, tmpColor);
       }
 
       const metalShift = 0.5 + 0.5 * Math.sin(time * 0.3 + plate.x * 0.18 + plate.z * 0.26);
-      tmpColor.copy(graphite).lerp(silver, metalShift);
-      tmpColor.multiplyScalar((0.045 + front * (0.38 + bass * 0.16) + tail * 0.07) * currentPack.socket);
+      tmpColor.copy(graphite).lerp(socketAccent, metalShift);
+      tmpColor.multiplyScalar((0.055 + liveBass * 0.34 + front * (0.48 + bass * 0.18) + tail * 0.09) * currentPack.socket);
       sockets.setColorAt(index, tmpColor);
     }
 
@@ -358,7 +375,8 @@ function createUnderGlow() {
       uImpactOrigin: { value: new THREE.Vector2(0, 0) },
       uImpactRadius: { value: 0 },
       uImpactStrength: { value: 0 },
-      uMode: { value: 0 }
+      uMode: { value: 0 },
+      uTint: { value: new THREE.Color(0xffffff) }
     },
     vertexShader: `
       varying vec2 vUv;
@@ -380,13 +398,29 @@ function createUnderGlow() {
       uniform float uImpactRadius;
       uniform float uImpactStrength;
       uniform float uMode;
+      uniform vec3 uTint;
 
       void main() {
         vec2 p = (vUv - 0.5) * vec2(32.0, 26.0);
         vec2 delta = p - uImpactOrigin;
         float distanceFromImpact = length(delta);
         float textureDetail = 0.5 + 0.5 * sin(p.x * 0.22 + uTime * 0.3);
-        if (uMode > 3.5) {
+        if (uMode > 8.5) {
+          distanceFromImpact = abs(delta.x + delta.y) * 0.82;
+          textureDetail = abs(sin(p.x * 1.2 + p.y * 1.2));
+        } else if (uMode > 7.5) {
+          distanceFromImpact += sin(atan(delta.y, delta.x) * 9.0) * 0.48;
+          textureDetail = abs(sin(p.x * 1.7 - p.y * 0.7));
+        } else if (uMode > 6.5) {
+          distanceFromImpact = min(abs(delta.x), abs(delta.y)) * 1.7;
+          textureDetail = max(abs(sin(p.x * 1.6)), abs(sin(p.y * 1.6)));
+        } else if (uMode > 5.5) {
+          distanceFromImpact = abs(delta.y);
+          textureDetail = 0.5 + 0.5 * sin(p.y * 1.1);
+        } else if (uMode > 4.5) {
+          distanceFromImpact += sin(distanceFromImpact * 2.8) * 0.24;
+          textureDetail = 0.5 + 0.5 * sin(length(p) * 1.5);
+        } else if (uMode > 3.5) {
           textureDetail = max(abs(sin(p.x * 1.5)), abs(sin(p.y * 1.5)));
         } else if (uMode > 2.5) {
           distanceFromImpact = (abs(delta.x) + abs(delta.y)) * 0.84;
@@ -401,10 +435,11 @@ function createUnderGlow() {
         float band = distanceFromImpact - uImpactRadius;
         float ripple = exp(-band * band / 0.85) * uImpactStrength;
         if (uMode > 3.5) ripple *= 0.25;
-        float power = 0.23 + uEnergy * 0.18 + uBass * 0.16 + uBeat * 0.08;
+        float power = 0.3 + uEnergy * 0.28 + uBass * 0.42 + uBeat * 0.16;
         vec3 graphite = vec3(0.008, 0.009, 0.011);
-        vec3 silver = mix(vec3(0.055), vec3(0.15), textureDetail);
-        gl_FragColor = vec4(graphite + silver * ripple * power, 1.0);
+        vec3 silver = mix(vec3(0.055), vec3(0.15), textureDetail) * uTint;
+        float floorGlow = (uBass * 0.24 + uEnergy * 0.12) * textureDetail;
+        gl_FragColor = vec4(graphite + silver * (floorGlow + ripple * power), 1.0);
       }
     `
   });
