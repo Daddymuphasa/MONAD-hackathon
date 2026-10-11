@@ -1,5 +1,22 @@
 # Papageddon Monad
 
+Papagedon is a music-reactive visual identity engine. Its Visual Memory NFT stores a declarative visual recipe and user-approved taste profile on Monad Testnet so the renderer can restore a wallet's preferred visual language across sessions.
+
+## Sponsor-powered data path
+
+- **Dynamic** provides connect-and-sign authentication, embedded/external wallet support, Monad Testnet switching and the signer used to mint Visual Memory NFTs. The SDK is lazy-loaded only when Connect is selected so it does not slow the real-time renderer.
+- **Alchemy** is the configured Monad JSON-RPC read layer. It supplies wallet balances, contract reads and confirmation data while Dynamic remains the user-controlled signing layer.
+- **Envio HyperIndex** indexes `MemoryMinted`, `MemoryUpdated` and `Transfer` events. Its GraphQL result determines whether a returning wallet has an existing visual memory and which memory was most recently updated.
+- **Nansen AI data** comes from the Monad address-label endpoint through a protected server route. Labels are converted into a privacy-conscious Visual DNA recommendation that selects a render pack and creates a style brief rather than displaying raw wallet analytics.
+
+The four services meet in `hydrateWalletIdentity` in `src/main.js`: a Dynamic-authenticated address is read over Alchemy, looked up in Envio and enriched through Nansen before Papagedon selects the starting visual experience.
+
+## Configuration
+
+Copy `.env.example` to `.env.local` and provide the browser-safe project values. Add `NANSEN_API_KEY` only to the deployment's server environment; never expose it with a `VITE_` prefix.
+
+The Envio indexer is in `envio/`. Deploy it through Envio Cloud, then set its GraphQL endpoint as `VITE_ENVIO_GRAPHQL_URL` before building the frontend.
+
 Papageddon is a browser music visualizer for the Monad hackathon. Its current demo turns bass impacts into physical motion across a branded nanotech display.
 
 ## Run locally

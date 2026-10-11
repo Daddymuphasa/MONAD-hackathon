@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=./node_modules/envio/evm.schema.json
+name: papagedon-visual-memory
+description: Real-time Visual Memory NFT ownership and preference evolution on Monad Testnet.
+contracts:
+  - name: PapagedonVisualMemory
+    events:
+      - event: "MemoryMinted(uint256 indexed tokenId, address indexed owner, bytes32 indexed contentHash, uint32 rendererVersion)"
+      - event: "MemoryUpdated(uint256 indexed tokenId, bytes32 indexed contentHash, uint32 rendererVersion)"
+      - event: "Transfer(address indexed from, address indexed to, uint256 indexed tokenId)"
+chains:
+  - id: 10143
+    start_block: 0
+    contracts:
+      - name: PapagedonVisualMemory
+        address: "0xD0793d7B3897A992ccc8f7188F5F2eE3AA21a590"

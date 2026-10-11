@@ -1,0 +1,17 @@
+{
+  "name": "papagedon-envio-indexer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "codegen": "envio codegen",
+    "dev": "envio dev",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "envio": "^3.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  }
+}

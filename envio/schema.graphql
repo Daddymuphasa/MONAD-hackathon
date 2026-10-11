@@ -1,0 +1,16 @@
+type VisualMemory {
+  id: ID!
+  owner: String! @index
+  contentHash: String!
+  rendererVersion: Int!
+  mintedAt: Int!
+  updatedAt: Int! @index
+  updateCount: Int!
+}
+
+type WalletMemoryProfile {
+  id: ID!
+  memoryCount: Int!
+  latestMemoryId: String
+  lastActivityAt: Int!
+}

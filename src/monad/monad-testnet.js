@@ -3,7 +3,9 @@ export const MONAD_TESTNET = {
   nativeCurrency: 'MON',
   paymentToken: 'Testnet MON',
   chainId: '0x279f',
-  visualMemoryContract: '0xD0793d7B3897A992ccc8f7188F5F2eE3AA21a590'
+  visualMemoryContract: '0xD0793d7B3897A992ccc8f7188F5F2eE3AA21a590',
+  rpcUrl: import.meta.env?.VITE_ALCHEMY_MONAD_RPC_URL || 'https://testnet-rpc.monad.xyz',
+  explorerUrl: 'https://testnet.monadexplorer.com'
 };
 
 export function buildPackQuote(prompt) {

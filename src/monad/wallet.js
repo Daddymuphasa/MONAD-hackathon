@@ -1,13 +1,19 @@
-import { BrowserProvider, Contract, ContractFactory, formatEther, keccak256, parseEther, toUtf8Bytes } from 'ethers';
+import { BrowserProvider, Contract, ContractFactory, JsonRpcProvider, formatEther, keccak256, parseEther, toUtf8Bytes } from 'ethers';
 import contractArtifact from './papagedon-visual-memory.json' with { type: 'json' };
+import { MONAD_TESTNET as NETWORK } from './monad-testnet.js';
 
 const MONAD_TESTNET_CHAIN_ID = '0x279f';
 const MONAD_TESTNET = {
   chainId: MONAD_TESTNET_CHAIN_ID,
   chainName: 'Monad Testnet',
   nativeCurrency: { name: 'Monad', symbol: 'MON', decimals: 18 },
-  rpcUrls: ['https://testnet-rpc.monad.xyz']
+  rpcUrls: [NETWORK.rpcUrl],
+  blockExplorerUrls: [NETWORK.explorerUrl]
 };
+
+export function createAlchemyProvider() {
+  return new JsonRpcProvider(NETWORK.rpcUrl, 10143, { staticNetwork: true });
+}
 
 async function ensureMonadTestnet(ethereum) {
   const currentChain = await ethereum.request({ method: 'eth_chainId' });
@@ -39,6 +45,26 @@ export async function connectMonadWallet() {
   const balance = await provider.getBalance(address);
 
   return { provider, signer, address, balance: formatEther(balance) };
+}
+
+export async function createDynamicWalletSession(primaryWallet) {
+  await primaryWallet.switchNetwork(10143);
+  const walletClient = await primaryWallet.getWalletClient();
+  const eip1193Provider = {
+    request: ({ method, params }) => walletClient.request({ method, params })
+  };
+  const provider = new BrowserProvider(eip1193Provider);
+  const signer = await provider.getSigner(primaryWallet.address);
+  const readProvider = createAlchemyProvider();
+  const balance = await readProvider.getBalance(primaryWallet.address);
+
+  return {
+    provider: readProvider,
+    signer,
+    address: primaryWallet.address,
+    balance: formatEther(balance),
+    authentication: 'dynamic'
+  };
 }
 
 export async function deployVisualMemoryContract(signer) {

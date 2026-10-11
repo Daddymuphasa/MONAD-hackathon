@@ -5,11 +5,12 @@ import { VISUALIZER_PACKS } from './visualizers/packs.js';
 import { createAutoMode } from './visualizers/auto-mode.js';
 import { MONAD_TESTNET, buildPackQuote } from './monad/monad-testnet.js';
 import {
-  connectMonadWallet,
   createVisualMemoryPayload,
   deployVisualMemoryContract,
   mintVisualMemory
 } from './monad/wallet.js';
+import { loadLatestVisualMemory } from './integrations/envio.js';
+import { loadNansenVisualDNA } from './integrations/nansen.js';
 
 const app = document.querySelector('#app');
 const packOptions = VISUALIZER_PACKS.map((pack) => `<option value="${pack.id}">${pack.name}</option>`).join('');
@@ -83,10 +84,18 @@ app.innerHTML = `
 
       <section class="chain-actions" aria-label="Monad deployment">
         <div class="chain-heading"><span>Visual Memory NFT</span><b>Testnet only</b></div>
-        <button id="connectWalletButton" type="button">Connect Wallet</button>
+        <div id="dynamicWalletRoot" class="dynamic-wallet-root">
+          <button id="connectWalletButton" type="button">Connect with Dynamic</button>
+        </div>
         <button id="deployContractButton" type="button" disabled>Deployed</button>
         <button id="mintMemoryButton" class="mint-action" type="button" disabled>Mint Visual Memory · 0.2 MON</button>
         <p id="chainOutput" role="status">Contract: ${MONAD_TESTNET.visualMemoryContract}</p>
+        <div class="integration-status" aria-label="Sponsor integrations">
+          <span>Dynamic</span><b id="dynamicStatus">checking</b>
+          <span>Alchemy</span><b id="alchemyStatus">RPC ready</b>
+          <span>Envio</span><b id="envioStatus">waiting</b>
+          <span>Nansen AI</span><b id="nansenStatus">waiting</b>
+        </div>
       </section>
       </div>
     </aside>
@@ -119,10 +128,14 @@ const sensitivity = document.querySelector('#sensitivity');
 const sensitivityValue = document.querySelector('#sensitivityValue');
 const autoModeButton = document.querySelector('#autoModeButton');
 const manualModeButton = document.querySelector('#manualModeButton');
-const connectWalletButton = document.querySelector('#connectWalletButton');
 const deployContractButton = document.querySelector('#deployContractButton');
 const mintMemoryButton = document.querySelector('#mintMemoryButton');
 const chainOutput = document.querySelector('#chainOutput');
+const dynamicStatus = document.querySelector('#dynamicStatus');
+const alchemyStatus = document.querySelector('#alchemyStatus');
+const envioStatus = document.querySelector('#envioStatus');
+const nansenStatus = document.querySelector('#nansenStatus');
+const dynamicWalletRoot = document.querySelector('#dynamicWalletRoot');
 const autoMode = createAutoMode(VISUALIZER_PACKS);
 
 let walletSession = null;
@@ -310,18 +323,62 @@ quoteButton.addEventListener('click', () => {
   quoteOutput.textContent = `Preview: ${quote.price} testnet MON for "${quote.packName}". No payment is being requested.`;
 });
 
-connectWalletButton.addEventListener('click', async () => {
-  connectWalletButton.disabled = true;
-  chainOutput.textContent = 'Waiting for wallet connection...';
+async function hydrateWalletIdentity(session) {
+  walletSession = session;
+  const shortAddress = `${session.address.slice(0, 6)}...${session.address.slice(-4)}`;
+  mintMemoryButton.disabled = false;
+  dynamicStatus.textContent = session.authentication === 'dynamic' ? 'authenticated' : 'fallback';
+  alchemyStatus.textContent = `${Number(session.balance).toFixed(3)} MON`;
+  chainOutput.textContent = `${shortAddress} connected. Restoring onchain Visual DNA...`;
+
+  const [envioResult, nansenResult] = await Promise.allSettled([
+    loadLatestVisualMemory(session.address),
+    loadNansenVisualDNA(session.address)
+  ]);
+
+  if (envioResult.status === 'fulfilled') {
+    const { configured, memory } = envioResult.value;
+    envioStatus.textContent = !configured ? 'add endpoint' : memory ? `memory #${memory.id}` : 'new identity';
+  } else {
+    envioStatus.textContent = 'unavailable';
+  }
+
+  if (nansenResult.status === 'fulfilled') {
+    const dna = nansenResult.value.visualDNA;
+    nansenStatus.textContent = `${nansenResult.value.labels.length} signals`;
+    if (dna?.preferredPack && VISUALIZER_PACKS.some((pack) => pack.id === dna.preferredPack)) {
+      packSelect.value = dna.preferredPack;
+      selectPack(dna.preferredPack);
+    }
+    if (dna?.styleBrief) packPrompt.value = dna.styleBrief;
+  } else {
+    nansenStatus.textContent = 'add API key';
+  }
+
+  chainOutput.textContent = `${shortAddress} ready. Envio memory and Nansen Visual DNA sync completed.`;
+}
+
+function handleWalletError(error) {
+  dynamicStatus.textContent = 'error';
+  chainOutput.textContent = error.shortMessage || error.message;
+}
+
+dynamicStatus.textContent = import.meta.env.VITE_DYNAMIC_ENVIRONMENT_ID ? 'ready' : 'needs env ID';
+document.querySelector('#connectWalletButton').addEventListener('click', async () => {
+  dynamicWalletRoot.innerHTML = '<span class="wallet-loading">Loading secure wallet...</span>';
+  const { mountDynamicWallet } = await import('./dynamic/wallet-bridge.jsx');
+  mountDynamicWallet(dynamicWalletRoot, {
+    onSession: hydrateWalletIdentity,
+    onError: handleWalletError,
+    autoOpen: true
+  });
+});
+
+window.addEventListener('papagedon:wallet-session', async (event) => {
   try {
-    walletSession = await connectMonadWallet();
-    const shortAddress = `${walletSession.address.slice(0, 6)}...${walletSession.address.slice(-4)}`;
-    connectWalletButton.textContent = shortAddress;
-    mintMemoryButton.disabled = false;
-    chainOutput.textContent = `${Number(walletSession.balance).toFixed(4)} testnet MON available. Visual Memory minting is ready.`;
+    await hydrateWalletIdentity(event.detail);
   } catch (error) {
-    connectWalletButton.disabled = false;
-    chainOutput.textContent = error.shortMessage || error.message;
+    handleWalletError(error);
   }
 });
 
