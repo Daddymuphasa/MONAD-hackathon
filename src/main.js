@@ -13,7 +13,10 @@ import { loadLatestVisualMemory } from './integrations/envio.js';
 import { loadNansenVisualDNA } from './integrations/nansen.js';
 
 const app = document.querySelector('#app');
-const packOptions = VISUALIZER_PACKS.map((pack) => `<option value="${pack.id}">${pack.name}</option>`).join('');
+const packOptions = [
+  ['Surface packs', VISUALIZER_PACKS.filter((pack) => !pack.sceneMode)],
+  ['3D scenes', VISUALIZER_PACKS.filter((pack) => pack.sceneMode)]
+].map(([label, packs]) => `<optgroup label="${label}">${packs.map((pack) => `<option value="${pack.id}">${pack.name}</option>`).join('')}</optgroup>`).join('');
 
 app.innerHTML = `
   <div id="brandIntro" class="brand-intro" aria-label="Papagedon opening animation">
@@ -24,7 +27,7 @@ app.innerHTML = `
     </div>
   </div>
   <section class="shell">
-    <canvas id="visualizer" aria-label="Papageddon live nanotech visualizer"></canvas>
+    <canvas id="visualizer" aria-label="Papagedon live music visualizer"></canvas>
     <img class="brand-mark" src="${import.meta.env.BASE_URL}assets/papagedon-mark.png" alt="Papagedon" />
     <aside class="panel">
       <span class="panel-trigger" aria-hidden="true"></span>

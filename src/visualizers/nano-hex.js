@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { VISUALIZER_PACKS } from './packs.js';
 import { createElectricNetwork } from './electric-network.js';
+import { createSculpturalModes } from './sculptural-modes.js';
 
 const PLATE_COUNT = 1073;
 const tmpObject = new THREE.Object3D();
@@ -19,6 +20,7 @@ export function createNanoHexVisualizer(canvas) {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.42;
+  const sculpturalModes = createSculpturalModes(renderer);
 
   const scene = new THREE.Scene();
   scene.fog = new THREE.FogExp2(0x050a0f, 0.017);
@@ -115,6 +117,12 @@ export function createNanoHexVisualizer(canvas) {
     const next = VISUALIZER_PACKS.find((pack) => pack.id === id);
     if (!next) return currentPack;
     currentPack = next;
+    if (next.sceneMode) {
+      sculpturalModes.setMode(next.sceneMode, next.glowColor);
+      sculpturalModes.resize(canvas.clientWidth, canvas.clientHeight);
+      return next;
+    }
+    sculpturalModes.setMode(null);
     socketAccent.setHex(next.glowColor ?? 0xb0b7ba);
     plates.geometry = next.plateGeometry;
     plateMaterial.color.setHex(next.plateColor);
@@ -156,6 +164,7 @@ export function createNanoHexVisualizer(canvas) {
 
   function resize() {
     const rect = canvas.getBoundingClientRect();
+    sculpturalModes.resize(rect.width, rect.height);
     const ratio = Math.min(window.devicePixelRatio || 1, rect.width < 720 ? 1.25 : 1.5);
     const width = Math.max(1, Math.floor(rect.width * ratio));
     const height = Math.max(1, Math.floor(rect.height * ratio));
@@ -182,6 +191,10 @@ export function createNanoHexVisualizer(canvas) {
     resize();
 
     const time = now / 1000;
+    if (currentPack.sceneMode) {
+      sculpturalModes.render(signals, time, delta);
+      return;
+    }
     const beat = Math.max(0, signals.beat || 0);
     const bass = Math.max(0, signals.bass || 0);
     const pulse = Math.max(0, signals.pulse || 0);

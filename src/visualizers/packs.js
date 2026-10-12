@@ -22,7 +22,7 @@ haloRing.rotateX(-Math.PI / 2);
 const copperRing = new THREE.TorusGeometry(0.21, 0.065, 4, 6);
 copperRing.rotateX(-Math.PI / 2);
 
-export const VISUALIZER_PACKS = [
+const surfacePacks = [
   {
     id: 'nano-hex',
     name: 'Nano Hex Genesis',
@@ -228,3 +228,27 @@ export const VISUALIZER_PACKS = [
     glowColor: 0xc78368
   }
 ];
+
+const sculpturalPacks = [
+  { id: 'resonant-sphere', name: 'Resonant Sphere', sceneMode: 'sphere', wave: 'deform', glowColor: 0xd9ba78 },
+  { id: 'orbit-forge', name: 'Orbit Forge', sceneMode: 'orbits', wave: 'orbit', glowColor: 0x85d6cb },
+  { id: 'aurora-ribbons', name: 'Aurora Ribbons', sceneMode: 'ribbons', wave: 'ribbon', glowColor: 0x8ecfad },
+  { id: 'spectrum-spires', name: 'Spectrum Spires', sceneMode: 'spires', wave: 'columns', glowColor: 0xffb878 },
+  { id: 'stellar-drift', name: 'Stellar Drift', sceneMode: 'galaxy', wave: 'spiral', glowColor: 0xc6a6ec },
+  { id: 'crystal-bloom', name: 'Crystal Bloom', sceneMode: 'crystals', wave: 'radial', glowColor: 0xf0a5bd },
+  { id: 'double-helix', name: 'Double Helix', sceneMode: 'helix', wave: 'helix', glowColor: 0x9adddf },
+  { id: 'liquid-mirror', name: 'Liquid Mirror', sceneMode: 'liquid', wave: 'ripple', glowColor: 0xb9d5ed },
+  { id: 'pulsar-core', name: 'Pulsar Core', sceneMode: 'pulsar', wave: 'burst', glowColor: 0xffd17f },
+  { id: 'wave-tunnel', name: 'Wave Tunnel', sceneMode: 'tunnel', wave: 'depth', glowColor: 0x9cdbbd }
+].map((pack, index) => ({
+  ...pack,
+  shaderMode: 10 + index,
+  lift: 1,
+  tilt: 1,
+  compression: 1,
+  warp: 1,
+  reflection: 1,
+  socket: 1
+}));
+
+export const VISUALIZER_PACKS = [...surfacePacks, ...sculpturalPacks];

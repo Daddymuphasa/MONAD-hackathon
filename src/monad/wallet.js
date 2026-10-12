@@ -90,6 +90,7 @@ export function createVisualMemoryPayload({ pack, sensitivity, autoMode, styleBr
       name: pack.name,
       wave: pack.wave,
       shaderMode: pack.shaderMode,
+      sceneMode: pack.sceneMode ?? null,
       lift: pack.lift,
       tilt: pack.tilt,
       compression: pack.compression,
