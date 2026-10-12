@@ -94,6 +94,7 @@ app.innerHTML = `
         <div id="dynamicWalletRoot" class="dynamic-wallet-root">
           <button id="connectWalletButton" type="button">Connect with Dynamic</button>
         </div>
+        <p id="walletConnectionState" class="wallet-connection-state" role="status" aria-live="polite">Wallet not connected</p>
         <button id="deployContractButton" type="button" disabled>Deployed</button>
         <button id="mintMemoryButton" class="mint-action" type="button" disabled>Mint Visual Memory · 0.2 MON</button>
         <p id="chainOutput" role="status">Contract: ${MONAD_TESTNET.visualMemoryContract}</p>
@@ -139,6 +140,7 @@ const manualModeButton = document.querySelector('#manualModeButton');
 const deployContractButton = document.querySelector('#deployContractButton');
 const mintMemoryButton = document.querySelector('#mintMemoryButton');
 const chainOutput = document.querySelector('#chainOutput');
+const walletConnectionState = document.querySelector('#walletConnectionState');
 const dynamicStatus = document.querySelector('#dynamicStatus');
 const alchemyStatus = document.querySelector('#alchemyStatus');
 const envioStatus = document.querySelector('#envioStatus');
@@ -344,9 +346,11 @@ async function hydrateWalletIdentity(session) {
   walletSession = session;
   const shortAddress = `${session.address.slice(0, 6)}...${session.address.slice(-4)}`;
   mintMemoryButton.disabled = false;
-  dynamicStatus.textContent = session.authentication === 'dynamic' ? 'authenticated' : 'fallback';
+  walletConnectionState.textContent = `Wallet Connected · ${shortAddress}`;
+  walletConnectionState.classList.add('is-connected');
+  dynamicStatus.textContent = 'wallet connected';
   alchemyStatus.textContent = `${Number(session.balance).toFixed(3)} MON`;
-  chainOutput.textContent = `${shortAddress} connected. Restoring onchain Visual DNA...`;
+  chainOutput.textContent = `Wallet connected. Restoring onchain Visual DNA for ${shortAddress}...`;
 
   const [envioResult, nansenResult] = await Promise.allSettled([
     loadLatestVisualMemory(session.address),
@@ -372,11 +376,14 @@ async function hydrateWalletIdentity(session) {
     nansenStatus.textContent = 'add API key';
   }
 
-  chainOutput.textContent = `${shortAddress} ready. Envio memory and Nansen Visual DNA sync completed.`;
+  walletConnectionState.textContent = `Wallet Connected · ${shortAddress}`;
+  chainOutput.textContent = `Wallet connected. Envio memory and Nansen Visual DNA sync completed for ${shortAddress}.`;
 }
 
 function handleWalletError(error) {
   dynamicStatus.textContent = 'error';
+  walletConnectionState.textContent = 'Wallet not connected';
+  walletConnectionState.classList.remove('is-connected');
   chainOutput.textContent = error.shortMessage || error.message;
 }
 
