@@ -16,6 +16,13 @@ const app = document.querySelector('#app');
 const packOptions = VISUALIZER_PACKS.map((pack) => `<option value="${pack.id}">${pack.name}</option>`).join('');
 
 app.innerHTML = `
+  <div id="brandIntro" class="brand-intro" aria-label="Papagedon opening animation">
+    <div class="brand-intro__aura" aria-hidden="true"></div>
+    <div class="brand-intro__stage">
+      <img class="brand-intro__logo" src="${import.meta.env.BASE_URL}assets/papagedon-intro-logo.png" alt="Papagedon" />
+      <div class="brand-intro__line" aria-hidden="true"></div>
+    </div>
+  </div>
   <section class="shell">
     <canvas id="visualizer" aria-label="Papageddon live nanotech visualizer"></canvas>
     <img class="brand-mark" src="${import.meta.env.BASE_URL}assets/papagedon-mark.png" alt="Papagedon" />
@@ -103,6 +110,7 @@ app.innerHTML = `
 `;
 
 const canvas = document.querySelector('#visualizer');
+const brandIntro = document.querySelector('#brandIntro');
 const visualizer = createNanoHexVisualizer(canvas);
 const trackAudio = document.querySelector('#trackAudio');
 const audio = createAudioEngine(trackAudio);
@@ -139,6 +147,15 @@ const dynamicWalletRoot = document.querySelector('#dynamicWalletRoot');
 const autoMode = createAutoMode(VISUALIZER_PACKS);
 
 let walletSession = null;
+
+function completeBrandIntro() {
+  if (!brandIntro) return;
+  brandIntro.classList.add('is-complete');
+  brandIntro.addEventListener('transitionend', () => brandIntro.remove(), { once: true });
+  window.setTimeout(() => brandIntro.remove(), 900);
+}
+
+window.setTimeout(completeBrandIntro, window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 500 : 3300);
 
 const meters = {
   bass: document.querySelector('#bassMeter'),
